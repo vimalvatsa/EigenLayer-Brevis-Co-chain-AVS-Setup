@@ -1,0 +1,33 @@
+# brevis gateway, will post sig to here
+bgw = "https://api.brevis.network"
+
+# BLS key for eigenlayer
+blspath = "/home/ubuntu/.eigenlayer/operator_keys/test.bls.key.json"
+blspwd = "Vimalamal@095"
+# ecdsa for onchain tx, needed in join. after that not needed during normal operation
+kspath = "/home/ubuntu/.eigenlayer/operator_keys/test.ecdsa.key.json"
+kspwd = "Vimalamal@095"
+
+# EigenLayer operator ID
+operID = "0x426666d670db73c009c1942adb5f38d5de6497a1"
+
+# per chain config
+[[multichain]]
+chainID = 1
+name = "Holesky Testnet"
+# Private gateway endpoint recommended
+gateway = "https://mainnet.infura.io/v3/ee2fd6c455b248348ad2e77b433da6cb"
+BlkInterval = 12
+BlkDelay = 2
+#Brevis = "0x63A825ADD2129410628a8561dDD059646FB49aB0"
+Brevis = "0x94373a4919B3240D86eA41593D5eBa789FEF3848"
+BrvEigen = "0x9FC952BdCbB7Daca7d420fA55b942405B073A89d"
+#BrvEigen = "0x94373a4919B3240D86eA41593D5eBa789FEF3848"
+BrvRegCo = "0x0dB4ceE042705d47Ef6C0818E82776359c3A80Ca"
+AVSDir = "0x055733000064333CaDDbC92763c58BF0192fFeBf"
+
+
+[node]
+eth_rpc_url = "https://ethereum-holesky-rpc.publicnode.com/"  # Replace this with your private Ethereum RPC
+#ecdsa_key_path =  "/home/ubuntu/.eigenlayer/operator_keys/test.ecdsa.key.json"  # Replace this with the actual path
+#bls_key_path =  "/home/ubuntu/.eigenlayer/operator_keys/test.bls.key.json"  # Replace this with the actual path

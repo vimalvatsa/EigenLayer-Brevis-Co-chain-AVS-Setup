@@ -1,0 +1,21 @@
+operator:
+    address: 0x426666d670db73C009C1942aDB5f38D5de6497a1
+    delegation_approver_address: 0x0000000000000000000000000000000000000000
+    staker_opt_out_window_blocks: 0
+    metadata_url: https://raw.githubusercontent.com/vimalvatsa/eigenlayertest/main/metadata.json
+el_delegation_manager_address: 0xA44151489861Fe9e3055d95adC98FbD462B948e7
+eth_rpc_url: https://ethereum-holesky-rpc.publicnode.com/
+chain_id: 17000
+private_key_store_path: /home/ubuntu/.eigenlayer/operator_keys/test.ecdsa.key.json
+#private_key_store_path: /home/ubuntu/eigenlayer-cli/tests/web3signer/operator_keys/opr.ecdsa.key.encrypted
+signer_type: local_keystore
+fireblocks:
+    api_key: ""
+    secret_key: ""
+    base_url: ""
+    vault_account_name: ""
+    secret_storage_type: ""
+    aws_region: ""
+    timeout: 3
+web3:
+    url: ""
