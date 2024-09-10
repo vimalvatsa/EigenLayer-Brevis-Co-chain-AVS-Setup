@@ -1,0 +1,264 @@
+---
+- name: Install prometheus,Grafana, Node Exporter and Grafana Mimir
+  hosts: all
+  become: true
+  tasks:
+
+    # Update apt and install prerequisites
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+    
+    - name: Install prerequisites
+      apt:
+        name:
+          - wget
+          - apt-transport-https
+          - software-properties-common
+        state: present
+
+    # Install Prometheus
+    - name: Download Prometheus
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v2.48.0/prometheus-2.48.0.linux-amd64.tar.gz"
+        dest: /tmp/prometheus-2.48.0.linux-amd64.tar.gz
+
+    - name: Extract Prometheus
+      ansible.builtin.unarchive:
+        src: /tmp/prometheus-2.48.0.linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Copy Prometheus binaries
+      copy:
+         src: "/tmp/prometheus-2.48.0.linux-amd64/{{ item }}"
+         dest: "/usr/local/bin/"
+         mode: '0755'
+         remote_src: yes
+      with_items:
+         - prometheus
+         - promtool
+
+
+    - name: Create Prometheus directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/prometheus
+        - /var/lib/prometheus
+
+    - name: Copy Prometheus configuration file
+      copy:
+        dest: /etc/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+
+          scrape_configs:
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+
+            - job_name: 'node_exporter'
+              static_configs:
+                - targets: ['localhost:9100']
+            
+          remote_write:
+            - url: http://localhost:9009/api/v1/push
+
+    - name: Create Prometheus systemd service file
+      copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=root
+          ExecStart=/usr/local/bin/prometheus \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.path=/var/lib/prometheus/ \
+            --web.console.templates=/usr/local/bin/consoles \
+            --web.console.libraries=/usr/local/bin/console_libraries
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start and enable Prometheus
+      systemd:
+        name: prometheus
+        enabled: yes
+        state: started
+
+    # Install Grafana
+    - name: Add Grafana APT repository key
+      ansible.builtin.get_url:
+        url: https://packages.grafana.com/gpg.key
+        dest: /usr/share/keyrings/grafana.key
+
+    - name: Add Grafana repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/grafana.key] https://packages.grafana.com/oss/deb stable main"
+        filename: grafana
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+
+    - name: Start and enable Grafana service
+      systemd:
+        name: grafana-server
+        enabled: yes
+        state: started
+
+    # Install Node Exporter
+    - name: Download Node Exporter
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter-1.6.1.linux-amd64.tar.gz
+
+    - name: Extract Node Exporter
+      ansible.builtin.unarchive:
+        src: /tmp/node_exporter-1.6.1.linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Copy Node Exporter binary
+      copy:
+        src: /tmp/node_exporter-1.6.1.linux-amd64/node_exporter
+        dest: /usr/local/bin/node_exporter
+        mode: '0755'
+
+    - name: Add Node Exporter user
+      user:
+        name: node_exporter
+        system: yes
+        shell: /bin/false
+
+    - name: Create Node Exporter systemd service file
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=node_exporter
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=default.target
+      notify:
+        - Reload systemd
+
+    - name: Start and enable Node Exporter
+      systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
+
+    # Install Grafana Mimir
+    - name: Download Mimir binary
+      get_url:
+        url: https://github.com/grafana/mimir/releases/latest/download/mimir-linux-amd64
+        dest: /usr/local/bin/mimir
+        mode: '0755'
+
+    - name: Ensure Mimir binary is executable
+      file:
+        path: /usr/local/bin/mimir
+        mode: '0755'
+        state: file
+    - name: Create directory for Mimir configuration
+      file:
+        path: /opt/mimir
+        state: directory
+        mode: '0755'
+    - name: Create Mimir configuration file
+      copy:
+        dest: /opt/mimir/demo.yaml 
+        content: |
+          # Do not use this configuration in production.
+          # It is for demonstration purposes only.
+          multitenancy_enabled: false
+
+          blocks_storage:
+            backend: filesystem
+            bucket_store:
+              sync_dir: /tmp/mimir/tsdb-sync
+            filesystem:
+              dir: /tmp/mimir/data/tsdb
+            tsdb:
+              dir: /tmp/mimir/tsdb
+
+          compactor:
+            data_dir: /tmp/mimir/compactor
+            sharding_ring:
+              kvstore:
+                store: memberlist
+
+          distributor:
+            ring:
+              instance_addr: 127.0.0.1
+              kvstore:
+                store: memberlist
+
+          ingester:
+            ring:
+              instance_addr: 127.0.0.1
+              kvstore:
+                store: memberlist
+              replication_factor: 1
+
+          ruler_storage:
+            backend: filesystem
+            filesystem:
+              dir: /tmp/mimir/rules
+
+          server:
+            http_listen_port: 9009
+            log_level: error
+
+          store_gateway:
+            sharding_ring:
+              replication_factor: 1
+
+    - name: Create Mimir systemd service file
+      copy:
+        dest: /etc/systemd/system/mimir.service
+        content: |
+          [Unit]
+          Description=Mimir Service
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/mimir --config.file=/opt/mimir/demo.yaml
+          Restart=on-failure
+          LimitNOFILE=65536
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    - name: Enable and start Mimir service
+      systemd:
+        name: mimir
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
